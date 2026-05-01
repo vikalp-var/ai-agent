@@ -67,7 +67,7 @@ class AgentLogger:
     def log_cost_summary(self, tracker: dict) -> None:
         self._write({"type": "cost_summary", **tracker})
 
-    # ── internal ──────────────────────────────────────────────────────────────
+    # ── internal  ──────────────────────────────────────────────────────────────
 
     def _write(self, payload: dict) -> None:
         payload["timestamp"] = datetime.now().isoformat()

@@ -14,7 +14,7 @@ USER_PLAN = os.getenv("USER_PLAN", "paid")   # "free" | "paid"
 CLASSIFIER_MODEL = "gpt-4.1-nano"
 
 # Main agent models (Anthropic Claude)
-CHEAP_MODEL    = "claude-sonnet-4-6"   # standard / medium / low complexity steps
+CHEAP_MODEL    = "claude-sonnet-4-6"   #  standard / medium / low complexity steps
 POWERFUL_MODEL = "claude-opus-4-7"     # high-complexity steps (paid users only)
 
 # Cost per 1K tokens (approximate, USD)

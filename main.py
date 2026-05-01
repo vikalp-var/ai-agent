@@ -6,7 +6,7 @@ load_dotenv()
 
 
 def main() -> None:
-    # Lazy import so .env is loaded before OpenAI client initialises
+    # Lazy import so .env  is loaded before OpenAI client initialises
     from agent.orchestrator import CodingAgent
 
     if len(sys.argv) > 1:

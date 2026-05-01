@@ -41,7 +41,7 @@ class Observer:
             lambda x: self.validate_tool_result(x["tool_name"], x["result"])
         )
 
-    # -- private helpers -------------------------------------------------------
+    # -- private helpers   -------------------------------------------------------
 
     def _validate_execution(self, result: dict) -> dict:
         stderr = (result.get("stderr") or "").lower()

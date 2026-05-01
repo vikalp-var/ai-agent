@@ -33,7 +33,7 @@ class Memory:
         with open(self.memory_file, "w", encoding="utf-8") as f:
             json.dump(self.long_term, f, indent=2)
 
-    # ── session (short-term) via InMemoryChatMessageHistory ──────────────────
+    # ── session (short-term) via  InMemoryChatMessageHistory ──────────────────
 
     def add_to_session(self, role: str, content: str) -> None:
         if role == "user":

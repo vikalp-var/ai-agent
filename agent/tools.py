@@ -143,7 +143,7 @@ def run_command(command: str) -> dict:
         return {"success": False, "error": str(exc)}
 
 
-# ── Registry ──────────────────────────────────────────────────────────────────
+# ── Registry  ──────────────────────────────────────────────────────────────────
 
 TOOLS = [write_file, read_file, execute_code, list_files, run_command]
 
