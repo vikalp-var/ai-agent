@@ -57,6 +57,14 @@
         font-size: 17px;
         font-weight: 700;
         color: var(--banner);
+        cursor: default;
+        user-select: none;
+      }
+      header h1.chat-active {
+        cursor: pointer;
+      }
+      header h1.chat-active:hover {
+        opacity: 0.8;
       }
       .badge {
         font-size: 11px;
@@ -965,7 +973,9 @@
   </head>
   <body>
     <header>
-      <h1>⚡ Coding Agent</h1>
+      <h1 onclick="if (chatMessages.length) newChat();" title="New Chat">
+        ⚡ Coding Agent
+      </h1>
       <span class="badge" id="statusBadge">Idle</span>
       <button class="new-chat-btn" onclick="newChat()">＋ New Chat</button>
       <div class="cost-pill">
@@ -1700,6 +1710,13 @@
             startedAt: chatMessages.length ? chatMessages[0].ts : now(),
           }),
         );
+        syncLogoState();
+      }
+
+      function syncLogoState() {
+        const logo = document.querySelector("header h1");
+        if (!logo) return;
+        logo.classList.toggle("chat-active", chatMessages.length > 0);
       }
 
       function loadFromLocal() {
@@ -1770,6 +1787,7 @@
         document.getElementById("hOut").textContent = "0";
         document.getElementById("hCost").textContent = "$0.0000";
         setRunning(false);
+        syncLogoState();
       }
 
       /* ── Long-term memory (server) ── */
@@ -2128,6 +2146,7 @@
       loadFromLocal();
       loadServerHistory();
       refreshFiles();
+      syncLogoState();
     </script>
   </body>
 </html>
