@@ -1,0 +1,10 @@
+openai>=1.30.0
+anthropicbedrock
+anthropicvertexai
+anthropic>=0.40.0
+langchain-anthropic>=0.3.0
+langchain-openai>=0.2.0
+python-dotenv>=1.0.0
+flask>=3.0.0
+langgraph>=0.2.0
+langchain-core>=0.3.0
