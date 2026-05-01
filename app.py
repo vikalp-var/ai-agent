@@ -2,6 +2,7 @@ import json
 import os
 import queue
 import threading
+import traceback
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -129,7 +130,9 @@ def run():
             )
             agent.run(task)
         except Exception as exc:
-            _output_queue.put({"type": "error", "message": f"[ERROR] {exc}"})
+            tb = traceback.format_exc()
+            print(f"[AGENT ERROR]\n{tb}", flush=True)
+            _output_queue.put({"type": "error", "message": f"[ERROR] {exc}\n\nDetails: {tb}"})
         finally:
             _agent_running = False
             _output_queue.put({"type": "done", "message": "Agent finished."})

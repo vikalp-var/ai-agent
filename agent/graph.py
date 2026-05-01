@@ -144,15 +144,15 @@ def build_graph(
     # Note: claude-opus-4-7 and claude-sonnet-4-6 deprecated the temperature param
     try:
         from langchain_anthropic import ChatAnthropic as _CA
-        cheap_llm    = _CA(model=CHEAP_MODEL).bind_tools(TOOLS, tool_choice="any")
-        powerful_llm = _CA(model=POWERFUL_MODEL).bind_tools(TOOLS, tool_choice="any")
+        cheap_llm    = _CA(model=CHEAP_MODEL, timeout=120, max_retries=3).bind_tools(TOOLS, tool_choice="any")
+        powerful_llm = _CA(model=POWERFUL_MODEL, timeout=120, max_retries=3).bind_tools(TOOLS, tool_choice="any")
         # Reviewer uses Sonnet (no tools needed)
-        reviewer_llm = _CA(model=CHEAP_MODEL)
+        reviewer_llm = _CA(model=CHEAP_MODEL, timeout=120, max_retries=3)
     except Exception:
         # Fallback to OpenAI if Anthropic key is missing / package not installed
-        cheap_llm    = ChatOpenAI(model=CLASSIFIER_MODEL, temperature=0).bind_tools(TOOLS, tool_choice="required")
-        powerful_llm = ChatOpenAI(model=CLASSIFIER_MODEL, temperature=0).bind_tools(TOOLS, tool_choice="required")
-        reviewer_llm = ChatOpenAI(model=CLASSIFIER_MODEL, temperature=0)
+        cheap_llm    = ChatOpenAI(model=CLASSIFIER_MODEL, temperature=0, timeout=120, max_retries=3).bind_tools(TOOLS, tool_choice="required")
+        powerful_llm = ChatOpenAI(model=CLASSIFIER_MODEL, temperature=0, timeout=120, max_retries=3).bind_tools(TOOLS, tool_choice="required")
+        reviewer_llm = ChatOpenAI(model=CLASSIFIER_MODEL, temperature=0, timeout=120, max_retries=3)
 
     def _llm_for(model_name: str):
         return powerful_llm if model_name == POWERFUL_MODEL else cheap_llm
