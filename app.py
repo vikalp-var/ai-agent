@@ -221,7 +221,7 @@ def post_chat_history():
     data = request.get_json(force=True)
     sessions = _load_chat_history()
     session_id = data.get("sessionId", "")
-    # Update existing entry for the same session instead of duplicating
+    # Update existing  entry for the same session instead of duplicating
     for entry in sessions:
         if entry.get("sessionId") == session_id:
             # Only update task if explicitly provided (first save sets it, follow-ups skip it)

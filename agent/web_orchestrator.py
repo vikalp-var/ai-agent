@@ -24,7 +24,7 @@ class WebCodingAgent:
         output_queue: queue.Queue,
         approval_event: threading.Event,
         approval_result: dict,
-        clarification_event: Optional[threading.Event] = None,  # kept for compat, unused
+        clarification_event: Optional[threading.Event] = None,  # kept  for compat, unused
         clarification_result: Optional[dict] = None,             # kept for compat, unused
         history: Optional[list] = None,
         session_id: Optional[str] = None,

@@ -438,7 +438,7 @@ def build_graph(
         log_fn(f"[COST] Est. cost    : ${t['cost_usd']:.4f} USD")
         return {}
 
-    # ── reviewer_node — second agent: QA / code-review pass ──────────────────
+    # ── reviewer_node — second agent: QA / code-review pass ──────────────────   
 
     def reviewer_node(state: AgentState) -> dict:
         """Independent QA agent that reviews what the coding agent built.

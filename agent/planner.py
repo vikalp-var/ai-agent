@@ -86,7 +86,7 @@ def decompose_task(
     plan: Optional[_TaskPlan] = result.get("parsed")
     raw_msg = result.get("raw")
 
-    # Extract usage from the raw AIMessage
+    # Extract usage  from the raw AIMessage
     class _Usage:
         def __init__(self, inp: int, out: int):
             self.prompt_tokens = inp

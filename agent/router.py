@@ -61,7 +61,7 @@ def classify_task_complexity(description: str) -> str:
         answer = response.content.strip().upper()
         return "high" if "HIGH" in answer else "medium"
     except Exception:
-        return "medium"  # Fail safe — cheaper model
+        return "medium"  # Fail safe —  cheaper model
 
 
 def route_model(task_type: str, complexity: str = "medium") -> str:
