@@ -1526,14 +1526,36 @@
         }
       }
 
-      /* ── Cost ── */
+      /* ── Cost — accumulates across all queries in the same chat ── */
+      let _totalIn = 0,
+        _totalOut = 0,
+        _totalCost = 0;
+
       function parseCost(msg) {
         const im = msg.match(/Input tokens\s*:\s*([\d,]+)/);
         const om = msg.match(/Output tokens\s*:\s*([\d,]+)/);
         const cm = msg.match(/Est\. cost\s*:\s*\$([\d.]+)/);
-        if (im) document.getElementById("hIn").textContent = im[1];
-        if (om) document.getElementById("hOut").textContent = om[1];
-        if (cm) document.getElementById("hCost").textContent = "$" + cm[1];
+        if (im) _totalIn += parseInt(im[1].replace(/,/g, ""), 10);
+        if (om) _totalOut += parseInt(om[1].replace(/,/g, ""), 10);
+        if (cm) _totalCost += parseFloat(cm[1]);
+        if (im)
+          document.getElementById("hIn").textContent =
+            _totalIn.toLocaleString();
+        if (om)
+          document.getElementById("hOut").textContent =
+            _totalOut.toLocaleString();
+        if (cm)
+          document.getElementById("hCost").textContent =
+            "$" + _totalCost.toFixed(4);
+      }
+
+      function resetCostCounters() {
+        _totalIn = 0;
+        _totalOut = 0;
+        _totalCost = 0;
+        document.getElementById("hIn").textContent = "0";
+        document.getElementById("hOut").textContent = "0";
+        document.getElementById("hCost").textContent = "$0.0000";
       }
 
       /* ── Files ── */
@@ -1783,9 +1805,7 @@
         const chat = document.getElementById("chat");
         chat.innerHTML = `<div class="chat-empty">⚡ <strong>Coding Agent</strong><br />Type a coding task below and press <kbd style="background:var(--border);padding:1px 5px;border-radius:4px;font-size:12px;">Enter</kbd> to run.</div>`;
         renderPlan([]);
-        document.getElementById("hIn").textContent = "0";
-        document.getElementById("hOut").textContent = "0";
-        document.getElementById("hCost").textContent = "$0.0000";
+        resetCostCounters();
         setRunning(false);
         syncLogoState();
       }

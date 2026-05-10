@@ -40,6 +40,73 @@ _approval_result: dict = {"value": None}
 _agent_running: bool = False
 
 
+# ── Conversational query detection & direct answering ────────────────────────
+
+def _is_conversational_query(task: str, history: list) -> bool:
+    """Return True if the query is conversational/general — not a coding task.
+    Uses GPT-4.1-nano for cheap, fast classification."""
+    try:
+        from langchain_core.messages import HumanMessage, SystemMessage
+        from langchain_openai import ChatOpenAI
+        _SYS = (
+            "You classify user messages for a coding AI agent.\n"
+            "Reply with exactly one word: CONVERSATIONAL or CODING.\n\n"
+            "CONVERSATIONAL — general chat, greetings, questions about previous work,\n"
+            "  asking what was built, asking to explain or summarise, memory/history questions,\n"
+            "  general knowledge questions not requiring code to be written.\n"
+            "  Examples: 'hello', 'what did I build?', 'explain what you did',\n"
+            "  'upar kya kiya', 'what was my last task', 'summarise my work',\n"
+            "  'how are you', 'what is python', 'can you explain this'\n\n"
+            "CODING — requests to write, create, fix, or run code / files / apps.\n"
+            "  Examples: 'build a todo app', 'fix the bug', 'create a calculator',\n"
+            "  'write a python script', 'add a dark mode button'\n\n"
+            "Reply with ONE word only."
+        )
+        # Include last history message for context
+        history_hint = ""
+        if history:
+            last = history[-1]
+            history_hint = f"\nLast assistant output (summary): {str(last.get('text',''))[:200]}"
+        llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0, max_tokens=5)
+        resp = llm.invoke([
+            SystemMessage(content=_SYS),
+            HumanMessage(content=f"User message: {task[:400]}{history_hint}"),
+        ])
+        return "CONVERSATIONAL" in resp.content.strip().upper()
+    except Exception:
+        return False
+
+
+def _answer_conversational_query(task: str, history: list, output_queue: queue.Queue) -> None:
+    """Answer a conversational query directly using the conversation history, push to SSE queue."""
+    try:
+        from langchain_core.messages import HumanMessage, SystemMessage
+        from langchain_openai import ChatOpenAI
+        _SYS = (
+            "You are a helpful AI coding assistant. Answer the user's question in a friendly,\n"
+            "concise way. If they ask about previous work, use the conversation history provided.\n"
+            "If they greet you, greet back. If they ask what was built, summarise it from history.\n"
+            "Always reply in English only, regardless of the language the user used."
+        )
+        # Build conversation context from history
+        history_lines = []
+        for m in history[-10:]:
+            role = "User" if m.get("role") == "user" else "Assistant"
+            text = m.get("text", "")[:500]
+            history_lines.append(f"{role}: {text}")
+        history_ctx = ("\nConversation history:\n" + "\n".join(history_lines)) if history_lines else ""
+
+        llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.3, max_tokens=400)
+        resp = llm.invoke([
+            SystemMessage(content=_SYS),
+            HumanMessage(content=f"{history_ctx}\n\nUser's current message: {task}"),
+        ])
+        answer = resp.content.strip()
+        output_queue.put({"type": "log", "message": answer})
+    except Exception as exc:
+        output_queue.put({"type": "log", "message": f"Sorry, I couldn't answer that. ({exc})"})
+
+
 # ── Pre-flight clarification (synchronous, before agent starts) ───────────────
 
 def _generate_clarification_question(task: str) -> str:
@@ -94,14 +161,32 @@ def run():
     ][:20]
     session_id = str(data.get("session_id") or "")[:64].strip()
 
+    # ── Conversational query check — answer directly without full agent ──────
+    # If the user is asking a general question or asking about previous work,
+    # answer immediately using LLM + history instead of running the coding agent.
+    clarification_answer = str(data.get("clarification_answer") or "").strip()[:500]
+    skip_clarification = bool(data.get("skip_clarification", False))
+
+    if not clarification_answer and not skip_clarification:
+        if _is_conversational_query(task, history):
+            _agent_running = True
+
+            def run_conversational():
+                global _agent_running
+                try:
+                    _answer_conversational_query(task, history, _output_queue)
+                finally:
+                    _agent_running = False
+                    _output_queue.put({"type": "done", "message": "Done."})
+
+            threading.Thread(target=run_conversational, daemon=True).start()
+            return jsonify({"status": "started"})
+
     # ── Synchronous pre-flight clarification ────────────────────────────────
     # On the FIRST call (no clarification_answer / skip flag), ask one question
     # and return immediately — the agent does NOT start yet.
     # On the second call (with clarification_answer or skip_clarification),
     # skip the question and enrich the task before running the agent.
-    clarification_answer = str(data.get("clarification_answer") or "").strip()[:500]
-    skip_clarification = bool(data.get("skip_clarification", False))
-
     if not clarification_answer and not skip_clarification:
         question = _generate_clarification_question(task)
         if question:
