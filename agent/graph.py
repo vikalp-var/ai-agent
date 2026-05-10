@@ -35,7 +35,7 @@ from agent.observer import Observer
 from agent.planner import decompose_task
 from agent.router import route_model
 from agent.tools import TOOLS
-from config import CHEAP_MODEL, CLASSIFIER_MODEL, MAX_RETRIES, MODEL_COSTS, POWERFUL_MODEL
+from config import ANTHROPIC_API_KEY, CHEAP_MODEL, CLASSIFIER_MODEL, MAX_RETRIES, MODEL_COSTS, POWERFUL_MODEL
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -140,22 +140,46 @@ def build_graph(
     _obs_runnable = observer.as_runnable()
 
     # ── LLMs ──────────────────────────────────────────────────────────────────
-    # Main agent: Claude via Anthropic (tool-calling)
-    # Note: claude-opus-4-7 and claude-sonnet-4-6 deprecated the temperature param
-    try:
-        from langchain_anthropic import ChatAnthropic as _CA
-        cheap_llm    = _CA(model=CHEAP_MODEL, timeout=120, max_retries=3).bind_tools(TOOLS, tool_choice="any")
-        powerful_llm = _CA(model=POWERFUL_MODEL, timeout=120, max_retries=3).bind_tools(TOOLS, tool_choice="any")
-        # Reviewer uses Sonnet (no tools needed)
-        reviewer_llm = _CA(model=CHEAP_MODEL, timeout=120, max_retries=3)
-    except Exception:
-        # Fallback to OpenAI if Anthropic key is missing / package not installed
-        cheap_llm    = ChatOpenAI(model=CLASSIFIER_MODEL, temperature=0, timeout=120, max_retries=3).bind_tools(TOOLS, tool_choice="required")
-        powerful_llm = ChatOpenAI(model=CLASSIFIER_MODEL, temperature=0, timeout=120, max_retries=3).bind_tools(TOOLS, tool_choice="required")
-        reviewer_llm = ChatOpenAI(model=CLASSIFIER_MODEL, temperature=0, timeout=120, max_retries=3)
+    # OpenAI GPT-4.1 fallbacks — always built.
+    _OPENAI_AGENT = "gpt-4.1"
+    _oai_cheap    = ChatOpenAI(model=_OPENAI_AGENT, temperature=0, timeout=120, max_retries=3).bind_tools(TOOLS, tool_choice="required")
+    _oai_powerful = ChatOpenAI(model=_OPENAI_AGENT, temperature=0, timeout=120, max_retries=3).bind_tools(TOOLS, tool_choice="required")
+    _oai_reviewer = ChatOpenAI(model=_OPENAI_AGENT, temperature=0, timeout=120, max_retries=3)
+
+    _ant_llms: dict = {}  # filled below if Anthropic key is present
+    if ANTHROPIC_API_KEY:
+        try:
+            from langchain_anthropic import ChatAnthropic as _CA
+            _ant_llms = {
+                "cheap":    _CA(model=CHEAP_MODEL,    api_key=ANTHROPIC_API_KEY, timeout=120, max_retries=1).bind_tools(TOOLS, tool_choice="any"),
+                "powerful": _CA(model=POWERFUL_MODEL, api_key=ANTHROPIC_API_KEY, timeout=120, max_retries=1).bind_tools(TOOLS, tool_choice="any"),
+                "reviewer": _CA(model=CHEAP_MODEL,    api_key=ANTHROPIC_API_KEY, timeout=120, max_retries=1),
+            }
+            cheap_llm    = _ant_llms["cheap"]
+            powerful_llm = _ant_llms["powerful"]
+            reviewer_llm = _ant_llms["reviewer"]
+            log_fn("[THINK] Using Anthropic Claude models")
+        except Exception as _init_err:
+            cheap_llm, powerful_llm, reviewer_llm = _oai_cheap, _oai_powerful, _oai_reviewer
+            log_fn(f"[THINK] Anthropic init failed — using OpenAI GPT-4.1")
+    else:
+        cheap_llm, powerful_llm, reviewer_llm = _oai_cheap, _oai_powerful, _oai_reviewer
+        log_fn("[THINK] No Anthropic key — using OpenAI GPT-4.1")
 
     def _llm_for(model_name: str):
         return powerful_llm if model_name == POWERFUL_MODEL else cheap_llm
+
+    def _invoke_llm(llm, messages):
+        """Invoke llm; on Anthropic 401 errors auto-fall back to OpenAI."""
+        try:
+            return llm.invoke(messages)
+        except Exception as exc:
+            err = str(exc).lower()
+            if _ant_llms and ("authentication" in err or "401" in err or "invalid x-api-key" in err):
+                log_fn("[WARN] Anthropic auth error — switching to OpenAI GPT-4.1")
+                fallback = _oai_powerful if llm is _ant_llms.get("powerful") else _oai_cheap
+                return fallback.invoke(messages)
+            raise
 
     def _update_tracker(tracker: dict, model_name: str, ai_msg: AIMessage) -> dict:
         tracker = dict(tracker)
@@ -296,7 +320,7 @@ def build_graph(
         )
 
         llm = _llm_for(model_name)
-        response: AIMessage = llm.invoke(messages_to_send)
+        response: AIMessage = _invoke_llm(llm, messages_to_send)
         tracker = _update_tracker(state["token_tracker"], model_name, response)
 
         if response.content:
@@ -467,7 +491,7 @@ def build_graph(
 
         log_fn("\n[REVIEWER] Reviewing output...")
         try:
-            resp = reviewer_llm.invoke([
+            resp = _invoke_llm(reviewer_llm, [
                 SystemMessage(content=_REVIEWER_SYSTEM),
                 HumanMessage(content=review_prompt),
             ])
